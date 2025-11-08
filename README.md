@@ -24,25 +24,17 @@ ML-Pipelines/
 
 ## Features
 
-- **Real-time CPU Utilization Prediction**
-  - Request rate analysis
-  - Active user impact
-  - Database connection monitoring
-  - Time-based patterns
-  - Business hours consideration
 
 - **Automated Training Pipeline**
   - Hyperparameter optimization with Optuna
-  - Model versioning and storage
   - Continuous training capability
   - Progress monitoring
 
 - **API Features**
   - Real-time predictions
   - Model training requests
-  - Model activation/deactivation
   - Training job monitoring
-  - Model metrics access
+
 
 ## Setup
 
@@ -141,20 +133,12 @@ The CPU utilization prediction model:
 - `GET /models/{version}/metrics`: Get model metrics
 - `POST /models/{version}/activate`: Activate a specific model version
 
-## Development
 
-### Running Tests
 
-```bash
-pytest tests/
-```
 
-### Code Style
 
-The project follows PEP 8 guidelines. Format code using:
-```bash
-black src/
-```
+# Future Work for Development
+
 
 ## Monitoring
 
@@ -166,13 +150,17 @@ The system provides real-time monitoring of:
 
 Access monitoring data through the `/metrics` endpoint.
 
-## Contributing
+- **Real-time CPU Utilization Prediction**
+  - Request rate analysis
+  - Active user impact
+  - Database connection monitoring
+  - Time-based patterns
+  - Business hours consideration
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+- **Model Registry**
+  - Model versioning and storage
+  - Model metrics access
+  - Model activation/deactivation
 
 ## License
 
