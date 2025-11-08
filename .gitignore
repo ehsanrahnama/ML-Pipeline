@@ -1,5 +1,7 @@
 artifacts/*
+logs/*
 
+*.zip
 *.joblib
 *.h5
 *.model

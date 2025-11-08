@@ -35,7 +35,7 @@ xgb_model.fit(
     verbose=False
 )
 
-
+# Evaluate the model
 y_pred_xgb = xgb_model.predict(X_test)
 
 r2_xgb = r2_score(y_test, y_pred_xgb)
