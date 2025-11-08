@@ -1,0 +1,14 @@
+artifacts/*
+
+*.joblib
+*.h5
+*.model
+*.ckpt
+*.pth
+*.pyc
+__pycache__/
+*.pyo
+
+*.log
+*.tmp
+*.bak
