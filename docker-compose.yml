@@ -1,0 +1,45 @@
+
+services:
+
+  app:
+    image: app:latest
+    container_name: app_api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports: 
+      - '8000:8000'
+    environment:
+      DOCKER_ENV: 'true'
+      MODEL_DB: sqlite:////shared_data/model_registry.db
+      PYTHONPATH: /app
+    volumes:
+      - ./data:/shared_data/data
+      - predictions_data:/shared_data
+      - ./artifacts:/shared_data/artifacts
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+
+    
+    command: uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+    
+
+  redis:
+    image: redis:latest
+    container_name: redis_1
+    restart: unless-stopped
+    # ports:
+    #   - '6379:6379' 
+    volumes:
+      - redis-data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+
+
+volumes:
+  predictions_data:
+  redis-data:
+
+
+  
