@@ -14,3 +14,6 @@ __pycache__/
 *.log
 *.tmp
 *.bak
+
+*.egg-info/
+dist/

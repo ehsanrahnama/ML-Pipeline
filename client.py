@@ -53,17 +53,18 @@ payload = {
     }
 
 
-r = request_api("POST", "train", payload)
-print(r)
-returned_job_id = r['job_id']
+# r = request_api("POST", "train", payload)
+# print(r)
+# returned_job_id = r['job_id']
 # print(100*"-")
-result = requests.get(f"http://localhost:8000/train/status/")
-print("Response from API:", result.json())
+# result = requests.get(f"http://localhost:8000/train/status/")
+# print("Response from API:", result.json())
 
 result = requests.get(f"http://localhost:8000/train/jobs")
-
-result = requests.post(f"http://localhost:8000/train/cancel/{returned_job_id}")
 print("Response from API:", result.json())
+
+# result = requests.post(f"http://localhost:8000/train/cancel/{returned_job_id}")
+# print("Response from API:", result.json())
 
 
 

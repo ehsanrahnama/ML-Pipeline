@@ -6,22 +6,31 @@ import joblib
 import redis
 from datetime import datetime
 import pandas as pd
-from multiprocessing import Process, Manager, Lock
+from multiprocessing import Process
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
-from training_worker import train_model
-from utils import get_logger_by_name
+
+from src.config.settings import (
+    REDIS_HOST, REDIS_PORT, REDIS_DB, 
+    INITIAL_MODEL_PATH, MAX_CONCURRENT_JOBS,
+    API_HOST, API_PORT
+)
+from src.api.training_worker import train_model
+from src.utils import get_logger_by_name
 
 
-logger = get_logger_by_name(__name__)
+logger = get_logger_by_name("api-app")
 
-r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+# Initialize Redis connection using configuration
+r = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    decode_responses=True
+)
 
-app = FastAPI()
-
-
-MAX_CONCURRENT_JOBS = 2
+app = FastAPI(title="CPU Utilization Predictor API")
 
 xgb_model = None 
 current_model_path = None
@@ -76,11 +85,11 @@ def startup_event():
             r.hset(key, "status", "stale")
             r.expire(key, 3600)
 
-    default_model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..','..', 'artifacts/models/xgboost_model_init.joblib'))
-    # default_model_path = os.path.join( 'artifacts', 'models', 'xgboost_model_init.joblib'))
-    # default_model_path = '/shared_data/artifacts/models/xgboost_model_init.joblib'
-    if os.path.exists(default_model_path):
-        load_model(default_model_path)
+    # Load initial model using configuration path
+    if os.path.exists(INITIAL_MODEL_PATH):
+        load_model(INITIAL_MODEL_PATH)
+    else:
+        logger.warning(f"No initial model found at {INITIAL_MODEL_PATH}")
 
 
 
@@ -191,4 +200,4 @@ def cancel_job(job_id: str):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)   
+    uvicorn.run(app, host=API_HOST, port=API_PORT)

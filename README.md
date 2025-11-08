@@ -134,7 +134,9 @@ The CPU utilization prediction model:
 
 - `POST /predict`: Make CPU utilization predictions
 - `POST /train`: Start a new training job
-- `GET /jobs/{job_id}`: Get training job status
+- `GET /train/status/{job_id}`: Get training job status
+- `POST /train/cancel/{job_id}`: Cancel running job
+- `GET /train/jobs`: Get all jobs
 - `GET /models`: List all available models
 - `GET /models/{version}/metrics`: Get model metrics
 - `POST /models/{version}/activate`: Activate a specific model version

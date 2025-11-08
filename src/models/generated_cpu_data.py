@@ -72,16 +72,17 @@ def generate_synthetic_cpu_data(n_samples=1000, scale_data=True):
         return raw_df
 
 if __name__ == "__main__":
-    import os
-    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data'))
-    os.makedirs(data_dir, exist_ok=True)
+    from src.config.settings import CPU_FEATURES_RAW, CPU_FEATURES_SCALED, CPU_TARGET
     
+    # Generate and save raw data
     raw_df = generate_synthetic_cpu_data(n_samples=1000, scale_data=False)
-    raw_df.to_csv(os.path.join(data_dir, 'cpu_raw_data.csv'), index=False)
+    raw_df.to_csv(CPU_FEATURES_RAW, index=False)
+    print(f"Raw data saved to: {CPU_FEATURES_RAW}")
 
-    # Save raw features and target  
-    # scaled_X, cpu_utilization = generate_synthetic_cpu_data(n_samples=1000, scale_data=True)
-    # scaled_data = scaled_X.copy()
-    # scaled_data['cpu_utilization'] = cpu_utilization
-    # scaled_data.to_csv(os.path.join(data_dir, 'cpu_scaled_data.csv'), index=False)  
+    # Generate and save scaled data
+    scaled_X, cpu_utilization = generate_synthetic_cpu_data(n_samples=1000, scale_data=True)
+    scaled_X.to_csv(CPU_FEATURES_SCALED, index=False)
+    pd.DataFrame({'cpu_utilization': cpu_utilization}).to_csv(CPU_TARGET, index=False)
+    print(f"Scaled data saved to: {CPU_FEATURES_SCALED}")
+    print(f"Target data saved to: {CPU_TARGET}")
     

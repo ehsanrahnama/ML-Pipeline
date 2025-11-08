@@ -10,27 +10,30 @@ import numpy as np
 import redis
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from models.generated_cpu_data import generate_synthetic_cpu_data
 import xgboost as xgb
-from models_sql import ModelEntry, SessionLocal, Base, engine
-from utils import get_logger_by_name
+
+from src.config.settings import (
+    REDIS_HOST, REDIS_PORT, REDIS_DB,
+    ARTIFACTS_DIR, DATA_DIR, CPU_FEATURES_RAW,
+    DEFAULT_N_TRIALS, MODEL_DB
+)
+from src.models.generated_cpu_data import generate_synthetic_cpu_data
+from src.api.models_sql import ModelEntry, SessionLocal, Base, engine
+from src.utils import get_logger_by_name
 
 logger = get_logger_by_name('training-worker')
 
-# Base.metadata.create_all(bind=engine)
+# Initialize database
+Base.metadata.create_all(bind=engine)
 
-## Define model directory for docker container
-MODEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../artifacts/models'))
-# MODEL_DIR = os.environ.get("MODEL_DIR", "/shared_data/artifacts/models/")
-# if not os.path.exists(MODEL_DIR):
-#     os.makedirs(MODEL_DIR)
+# Model directory is now handled by settings.py
 
 
 
 def save_model_and_register(best_estimator, params, metrics):
     version = f"v_{int(time.time())}_{uuid.uuid4().hex[:6]}"
     filename = f"{version}.joblib"
-    path = os.path.join(MODEL_DIR, filename)
+    path = os.path.join(ARTIFACTS_DIR, 'models', filename)
     joblib.dump(best_estimator, path)
 
     db = SessionLocal()
@@ -102,30 +105,29 @@ def objective(trial, X_train, X_test, y_train, y_test):
 
 
 
-def train_model(job_id, payload, redis_host="localhost"):
+def train_model(job_id, payload):
     """Train the model with Redis connection error handling.
     Args:
         job_id: Unique identifier for the training job
         payload: Dictionary containing training parameters
-        redis_host: Redis host address (default: localhost for local testing, use "redis" for container)
     """
     try:
         r = redis.Redis(
-            host=redis_host,
-            port=6379,
-            db=0,
+            host=REDIS_HOST,
+            port=REDIS_PORT,
+            db=REDIS_DB,
             decode_responses=True,
             socket_connect_timeout=5  # 5 second timeout
         )
         # Test the connection
         r.ping()
     except redis.ConnectionError as e:
-        logger.error(f"Failed to connect to Redis at {redis_host}:6379 - {str(e)}")
+        logger.error(f"Failed to connect to Redis at {REDIS_HOST}:{REDIS_PORT} - {str(e)}")
         return
     
     start_time = time.time()
-    data_path = payload.get("data_path", '/shared_data/predictions_log.csv')
-    n_trials = payload.get("n_trials", 20)
+    data_path = payload.get("data_path", str(CPU_FEATURES_RAW))
+    n_trials = payload.get("n_trials", DEFAULT_N_TRIALS)
 
 
     r.hset(f"job:{job_id}", mapping={"status": "running", "progress": 0})
@@ -187,27 +189,22 @@ def train_model(job_id, payload, redis_host="localhost"):
 
 if __name__ == "__main__":
     # For local testing with CPU utilization data
-    import redis
-    
-    # Use generated data by default
-    data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'cpu_features_raw.csv'))
-    
     try:
         # Try to start Redis locally if not running
-        r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+        r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
         r.ping()  # Test connection
         logger.info("Connected to Redis successfully")
         
         # Set up test job
         job_id = "test_cpu_job"
         payload = {
-            "data_path": data_path,  # Will use synthetic data if file doesn't exist
+            "data_path": str(CPU_FEATURES_RAW),  # Will use synthetic data if file doesn't exist
             "n_trials": 10  # Reduced trials for testing
         }
         
         # Queue and run the job
         r.hset(f"job:{job_id}", mapping={"status": "queued", "progress": 0})
-        train_model(job_id, payload, redis_host="localhost")
+        train_model(job_id, payload)
         
         # Print results
         results = r.hgetall(f"job:{job_id}")
@@ -220,8 +217,8 @@ if __name__ == "__main__":
             print("\nNo results found. Check if training completed successfully.")
             
     except redis.ConnectionError as e:
-        print(f"\nError: Could not connect to Redis - {str(e)}")
-        print("\nPlease ensure Redis is running locally with:")
+        print(f"\nError: Could not connect to Redis at {REDIS_HOST}:{REDIS_PORT} - {str(e)}")
+        print("\nPlease ensure Redis is running with:")
         print("    sudo service redis-server start")
         print("    # OR")
         print("    redis-server")
