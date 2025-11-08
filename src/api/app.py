@@ -12,9 +12,13 @@ from pydantic import BaseModel
 import uvicorn
 
 from src.config.settings import (
-    REDIS_HOST, REDIS_PORT, REDIS_DB, 
-    INITIAL_MODEL_PATH, MAX_CONCURRENT_JOBS,
-    API_HOST, API_PORT
+    REDIS_HOST,
+    REDIS_PORT,
+    REDIS_DB,
+    INITIAL_MODEL_PATH,
+    MAX_CONCURRENT_JOBS,
+    API_HOST,
+    API_PORT,
 )
 from src.api.training_worker import train_model
 from src.utils import get_logger_by_name
@@ -23,16 +27,11 @@ from src.utils import get_logger_by_name
 logger = get_logger_by_name("api-app")
 
 # Initialize Redis connection using configuration
-r = redis.Redis(
-    host=REDIS_HOST,
-    port=REDIS_PORT,
-    db=REDIS_DB,
-    decode_responses=True
-)
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
 app = FastAPI(title="CPU Utilization Predictor API")
 
-xgb_model = None 
+xgb_model = None
 current_model_path = None
 previous_model_path = None
 
@@ -48,10 +47,8 @@ class PredictionRequest(BaseModel):
     is_business_hour: int
 
 
-
-
 def load_model(path: str):
-  
+
     global xgb_model, current_model_path, previous_model_path
     try:
 
@@ -92,8 +89,6 @@ def startup_event():
         logger.warning(f"No initial model found at {INITIAL_MODEL_PATH}")
 
 
-
-
 @app.post("/predict")
 def predict_pending_ratio(request: PredictionRequest):
     """Accept a PredictionRequest, create a single-row DataFrame and return model prediction.
@@ -114,15 +109,10 @@ def predict_pending_ratio(request: PredictionRequest):
         df = pd.DataFrame([data])
         prediction = xgb_model.predict(df)
 
-        return {
-            "prediction_input": data,
-            "cpu_utilization_pred": float(prediction[0])
-        }
+        return {"prediction_input": data, "cpu_utilization_pred": float(prediction[0])}
     except Exception as e:
         logger.exception("Prediction failed")
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
 
 @app.post("/train")
@@ -130,16 +120,14 @@ def create_training_job(payload: dict = {}):
 
     # with r.lock("job_creation_lock", blocking_timeout=5):
     active_jobs = [
-        job_id
-        for job_id in r.keys("job:*")
-        if r.hget(job_id, "status") == "running"
+        job_id for job_id in r.keys("job:*") if r.hget(job_id, "status") == "running"
     ]
     if len(active_jobs) >= MAX_CONCURRENT_JOBS:
         raise HTTPException(
             status_code=429,
-            detail=f"Too many concurrent training jobs ({len(active_jobs)} running). Max allowed is {MAX_CONCURRENT_JOBS}."
+            detail=f"Too many concurrent training jobs ({len(active_jobs)} running). Max allowed is {MAX_CONCURRENT_JOBS}.",
         )
-    
+
     job_id = str(uuid.uuid4())
     r.hset(f"job:{job_id}", mapping={"status": "queued", "progress": 0})
     # r.expire(f"job:{job_id}", 3600) # expire in 1 hour
@@ -147,6 +135,7 @@ def create_training_job(payload: dict = {}):
     p.start()
     r.hset(f"job:{job_id}", "pid", p.pid)
     return {"job_id": job_id, "status": "queued"}
+
 
 @app.get("/train/jobs")
 def list_training_jobs(status: str = None):
@@ -156,16 +145,17 @@ def list_training_jobs(status: str = None):
         if status and job_data.get("status") != status:
             continue
         job_id = key.split(":")[1]
-        jobs.append({
-            "job_id": job_id,
-            "status": job_data.get("status"),
-            "progress": job_data.get("progress"),
-            "elapsed_time": job_data.get("elapsed_time"),
-            "error": job_data.get("error"),
-        })
+        jobs.append(
+            {
+                "job_id": job_id,
+                "status": job_data.get("status"),
+                "progress": job_data.get("progress"),
+                "elapsed_time": job_data.get("elapsed_time"),
+                "error": job_data.get("error"),
+            }
+        )
     jobs.sort(key=lambda x: x["job_id"], reverse=True)
     return {"total_jobs": len(jobs), "jobs": jobs}
-
 
 
 @app.get("/train/status/{job_id}")
@@ -194,9 +184,9 @@ def cancel_job(job_id: str):
         return {"job_id": job_id, "status": "cancelled"}
     except ProcessLookupError:
         r.hset(f"job:{job_id}", "status", "finished")
-        raise HTTPException(status_code=400, detail="Process already finished or terminated")
-
-
+        raise HTTPException(
+            status_code=400, detail="Process already finished or terminated"
+        )
 
 
 if __name__ == "__main__":
