@@ -10,10 +10,13 @@ from multiprocessing import Process, Manager, Lock
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
+from training_worker import train_model
 from utils import get_logger_by_name
+
 
 logger = get_logger_by_name(__name__)
 
+r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
 app = FastAPI()
 
@@ -67,11 +70,11 @@ def startup_event():
     # initialize_database()
 
     # Mark any running or queued jobs as stale on startup
-    # for key in r.keys("job:*"):
-    #     status = r.hget(key, "status")
-    #     if status in ("running", "queued"):
-    #         r.hset(key, "status", "stale")
-    #         r.expire(key, 3600)
+    for key in r.keys("job:*"):
+        status = r.hget(key, "status")
+        if status in ("running", "queued"):
+            r.hset(key, "status", "stale")
+            r.expire(key, 3600)
 
     default_model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..','..', 'artifacts/models/xgboost_model_init.joblib'))
     # default_model_path = os.path.join( 'artifacts', 'models', 'xgboost_model_init.joblib'))
@@ -110,6 +113,79 @@ def predict_pending_ratio(request: PredictionRequest):
         logger.exception("Prediction failed")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+
+@app.post("/train")
+def create_training_job(payload: dict = {}):
+
+    # with r.lock("job_creation_lock", blocking_timeout=5):
+    active_jobs = [
+        job_id
+        for job_id in r.keys("job:*")
+        if r.hget(job_id, "status") == "running"
+    ]
+    if len(active_jobs) >= MAX_CONCURRENT_JOBS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many concurrent training jobs ({len(active_jobs)} running). Max allowed is {MAX_CONCURRENT_JOBS}."
+        )
+    
+    job_id = str(uuid.uuid4())
+    r.hset(f"job:{job_id}", mapping={"status": "queued", "progress": 0})
+    # r.expire(f"job:{job_id}", 3600) # expire in 1 hour
+    p = Process(target=train_model, args=(job_id, payload))
+    p.start()
+    r.hset(f"job:{job_id}", "pid", p.pid)
+    return {"job_id": job_id, "status": "queued"}
+
+@app.get("/train/jobs")
+def list_training_jobs(status: str = None):
+    jobs = []
+    for key in r.keys("job:*"):
+        job_data = r.hgetall(key)
+        if status and job_data.get("status") != status:
+            continue
+        job_id = key.split(":")[1]
+        jobs.append({
+            "job_id": job_id,
+            "status": job_data.get("status"),
+            "progress": job_data.get("progress"),
+            "elapsed_time": job_data.get("elapsed_time"),
+            "error": job_data.get("error"),
+        })
+    jobs.sort(key=lambda x: x["job_id"], reverse=True)
+    return {"total_jobs": len(jobs), "jobs": jobs}
+
+
+
+@app.get("/train/status/{job_id}")
+def get_status(job_id: str):
+    job = r.hgetall(f"job:{job_id}")
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if "metrics" in job:
+        job["metrics"] = eval(job["metrics"])
+    return job
+
+
+@app.post("/train/cancel/{job_id}")
+def cancel_job(job_id: str):
+    job = r.hgetall(f"job:{job_id}")
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    pid = job.get("pid")
+    if not pid:
+        raise HTTPException(status_code=400, detail="PID not found for job")
+
+    try:
+        os.kill(int(pid), signal.SIGTERM)
+        r.hset(f"job:{job_id}", "status", "cancelled")
+        return {"job_id": job_id, "status": "cancelled"}
+    except ProcessLookupError:
+        r.hset(f"job:{job_id}", "status", "finished")
+        raise HTTPException(status_code=400, detail="Process already finished or terminated")
 
 
 
