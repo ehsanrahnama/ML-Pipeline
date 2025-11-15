@@ -7,7 +7,7 @@ import redis
 from rq import Queue
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
-from datetime import datetime
+from datetime import datetime, timezone
 import pandas as pd
 from multiprocessing import Process
 from fastapi import FastAPI, HTTPException
@@ -164,11 +164,15 @@ def list_training_jobs(status: str = None):
         ts = j.get("created_at")
         if ts:
             try:
-                return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                # Ensure returned datetime is timezone-aware (use UTC if none)
+                if parsed.tzinfo is None:
+                    return parsed.replace(tzinfo=timezone.utc)
+                return parsed
             except Exception:
                 pass
-        # fallback: use job_id string (lexicographic) as last-resort key
-        return datetime.fromtimestamp(0)
+        # fallback: epoch as timezone-aware UTC
+        return datetime.fromtimestamp(0, tz=timezone.utc)
 
     jobs.sort(key=_job_time_key, reverse=True)
 
