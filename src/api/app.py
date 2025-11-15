@@ -30,9 +30,9 @@ from src.utils import get_logger_by_name
 # Two Redis connections:
 # 1. With decode_responses=True for text operations (job hashes)
 # 2. Without decode_responses for RQ (RQ needs raw bytes for pickle serialization)
-redis_text = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+redis_text = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 redis_binary = redis.Redis(
-    host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=False
+    host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=False
 )
 train_queue = Queue("train_queue", connection=redis_binary)
 
@@ -136,7 +136,7 @@ def create_training_job(payload: dict = {}):
 
 @app.get("/train/jobs")
 def list_training_jobs(status: str = None):
-    
+
     jobs = []
 
     for key in redis_text.keys("job:*"):
