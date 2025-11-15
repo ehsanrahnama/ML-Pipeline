@@ -2,7 +2,7 @@
 services:
 
   app:
-    image: app:latest
+    image: app:v4
     container_name: app_api
     build:
       context: .
@@ -36,6 +36,21 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
 
+
+  worker:
+    image: app:v4
+    container_name: worker_training
+    command: rq worker train_queue --url redis://redis:6379/0
+    volumes:
+      - ./data:/shared_data/data
+      - predictions_data:/shared_data
+      - ./artifacts:/shared_data/artifacts
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - redis
+    environment:
+      DOCKER_ENV: 'true'
 
 volumes:
   predictions_data:

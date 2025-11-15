@@ -184,7 +184,7 @@ def train_model(job_id, payload):
             **study.best_params, n_jobs=1, objective="reg:squarederror"
         )
 
-        steps = 50
+        steps = 5
         for i in range(steps):
             # Check cancel status before continuing
             if r.hget(f"job:{job_id}", "status") == "cancelled":
