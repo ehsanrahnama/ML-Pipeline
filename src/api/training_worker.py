@@ -166,6 +166,7 @@ def train_model(job_id, payload):
     data_path = payload.get("data_path", str(CPU_FEATURES_RAW))
     n_trials = payload.get("n_trials", DEFAULT_N_TRIALS)
 
+    logger.info(f"[TRAIN] started job {job_id}, pid={os.getpid()}")
     r.hset(f"job:{job_id}", mapping={"status": "running", "progress": 0})
 
     try:
@@ -183,7 +184,7 @@ def train_model(job_id, payload):
             **study.best_params, n_jobs=1, objective="reg:squarederror"
         )
 
-        steps = 5
+        steps = 50
         for i in range(steps):
             # Check cancel status before continuing
             if r.hget(f"job:{job_id}", "status") == "cancelled":
